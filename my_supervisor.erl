@@ -8,6 +8,7 @@
 
 -module(my_supervisor).
 -export([start_link/2, stop/1]).
+-export([start_child/4]).
 -export([init/1]).
 
 start_link(Name, ChildSpecList) ->
@@ -40,6 +41,9 @@ loop(ChildList) ->
     {'EXIT', Pid, _Reason} ->
       NewChildList = restart_child(Pid, ChildList),
       loop(NewChildList);
+    {start_child, From, Child = {_M, _F, _A}} ->
+      From ! {reply, Child},
+      loop(ChildList);
     {stop, From}  ->
       From ! {reply, terminate(ChildList)}
   end.
@@ -57,3 +61,11 @@ terminate([{Pid, _} | ChildList]) ->
   exit(Pid, kill),
   terminate(ChildList);
 terminate(_ChildList) -> ok.
+
+%% Client routine to start a child process after the supervisor
+%% has started. A corresponding clause is added to the supervisor
+%% loop.
+
+start_child(Name, Module, Function, Argument) ->
+  Name ! {start_child, self(), {Module, Function, Argument}},
+  receive {reply, Reply} -> Reply end.
