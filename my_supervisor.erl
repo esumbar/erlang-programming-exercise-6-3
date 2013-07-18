@@ -31,7 +31,7 @@ start_children([{M, F, A} | ChildSpecList]) ->
 %% child, replacing its entry in the list of children stored in the ChildList variable:
 
 restart_child(Pid, ChildList) ->
-  {value, {Pid, {M,F,A}}} = lists:keysearch(Pid, 1, ChildList),
+  {Pid, {M,F,A}} = lists:keyfind(Pid, 1, ChildList),
   {ok, NewPid} = apply(M,F,A),
   [{NewPid, {M,F,A}}|lists:keydelete(Pid,1,ChildList)].
 
