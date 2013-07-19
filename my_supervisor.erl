@@ -9,6 +9,7 @@
 -module(my_supervisor).
 -export([start_link/2, stop/1]).
 -export([start_child/4, stop_child/2]).
+-export([print_childlist/1]).
 -export([init/1]).
 
 start_link(Name, ChildSpecList) ->
@@ -49,6 +50,9 @@ loop(ChildList) ->
       NewChildList = terminate_child(Id, ChildList),
       From ! {reply, ok},
       loop(NewChildList);
+    {print_childlist, From} ->
+      From ! {reply, ChildList},
+      loop(ChildList);
     {stop, From}  ->
       From ! {reply, terminate(ChildList)}
   end.
@@ -102,3 +106,9 @@ terminate_child(Id, [{Id, Pid, _} | ChildList]) ->
   terminate_child(Id, ChildList);
 terminate_child(Id, [Child | ChildList]) ->
   [Child | terminate_child(Id, ChildList)].
+
+%% Client routine to print the ChildList.
+
+print_childlist(Name) ->
+  Name ! {print_childlist, self()},
+  receive {reply, Reply} -> Reply end.
