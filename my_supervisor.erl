@@ -8,7 +8,7 @@
 
 -module(my_supervisor).
 -export([start_link/2, stop/1]).
--export([start_child/4]).
+-export([start_child/4, stop_child/2]).
 -export([init/1]).
 
 start_link(Name, ChildSpecList) ->
@@ -32,9 +32,9 @@ start_children(Id, [{M, F, A} | ChildSpecList]) ->
 %% child, replacing its entry in the list of children stored in the ChildList variable:
 
 restart_child(Pid, ChildList) ->
-  {Id, Pid, {M,F,A}} = lists:keyfind(Pid, 1, ChildList),
+  {Id, Pid, {M,F,A}} = lists:keyfind(Pid, 2, ChildList),
   {ok, NewPid} = apply(M,F,A),
-  [{Id, NewPid, {M,F,A}}|lists:keydelete(Pid,1,ChildList)].
+  [{Id, NewPid, {M,F,A}}|lists:keydelete(Pid,2,ChildList)].
 
 loop(ChildList) ->
   receive
@@ -44,6 +44,10 @@ loop(ChildList) ->
     {start_child, From, Child} ->
       {Reply, NewChildList} = start_child(Child, ChildList),
       From ! {reply, Reply},
+      loop(NewChildList);
+    {stop_child, From, Id} ->
+      NewChildList = terminate_child(Id, ChildList),
+      From ! {reply, ok},
       loop(NewChildList);
     {stop, From}  ->
       From ! {reply, terminate(ChildList)}
@@ -82,5 +86,19 @@ start_child({M, F, A}, ChildList) ->
 
 next_id([]) -> 1;
 next_id(ChildList) ->
-  {Id, _, _} = hd(lists:reverse(lists:keysort(4, ChildList))),
+  {Id, _, _} = hd(lists:reverse(lists:keysort(1, ChildList))),
   Id + 1.
+
+%% Client and supervisor routines for stopping a child.
+
+stop_child(Name, Id) ->
+  Name ! {stop_child, self(), Id},
+  receive {reply, Reply} -> Reply end.
+
+terminate_child(_, []) -> [];
+terminate_child(Id, [{Id, Pid, _} | ChildList]) ->
+  unlink(Pid),
+  exit(Pid, kill),
+  terminate_child(Id, ChildList);
+terminate_child(Id, [Child | ChildList]) ->
+  [Child | terminate_child(Id, ChildList)].
