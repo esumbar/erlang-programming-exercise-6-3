@@ -16,15 +16,15 @@ start_link(Name, ChildSpecList) ->
 
 init(ChildSpecList) ->
   process_flag(trap_exit, true),
-  loop(start_children(ChildSpecList)).
+  loop(start_children(_Id = 1, ChildSpecList)).
 
-start_children([]) -> [];
-start_children([{M, F, A} | ChildSpecList]) ->
+start_children(_, []) -> [];
+start_children(Id, [{M, F, A} | ChildSpecList]) ->
   case (catch apply(M,F,A)) of
     {ok, Pid} ->
-      [{Pid, {M,F,A}}|start_children(ChildSpecList)];
+      [{Id, Pid, {M,F,A}}|start_children(Id + 1, ChildSpecList)];
     _ ->
-      start_children(ChildSpecList)
+      start_children(Id + 1, ChildSpecList)
   end.
 
 %% The loop of the supervisor waits in a receive clause for EXIT and stop messages. 
@@ -32,9 +32,9 @@ start_children([{M, F, A} | ChildSpecList]) ->
 %% child, replacing its entry in the list of children stored in the ChildList variable:
 
 restart_child(Pid, ChildList) ->
-  {Pid, {M,F,A}} = lists:keyfind(Pid, 1, ChildList),
+  {Id, Pid, {M,F,A}} = lists:keyfind(Pid, 1, ChildList),
   {ok, NewPid} = apply(M,F,A),
-  [{NewPid, {M,F,A}}|lists:keydelete(Pid,1,ChildList)].
+  [{Id, NewPid, {M,F,A}}|lists:keydelete(Pid,1,ChildList)].
 
 loop(ChildList) ->
   receive
@@ -58,7 +58,7 @@ stop(Name) ->
   Name ! {stop, self()},
   receive {reply, Reply} -> Reply end.
 
-terminate([{Pid, _} | ChildList]) ->
+terminate([{_, Pid, _} | ChildList]) ->
   exit(Pid, kill),
   terminate(ChildList);
 terminate(_ChildList) -> ok.
@@ -72,9 +72,15 @@ start_child(Name, Module, Function, Argument) ->
   receive {reply, Reply} -> Reply end.
 
 start_child({M, F, A}, ChildList) ->
+  Id = next_id(ChildList),
   case (catch apply(M,F,A)) of
     {ok, Pid} ->
-      {ok, [{Pid, {M,F,A}} | ChildList]};
+      {{ok, Id}, [{Id, Pid, {M,F,A}} | ChildList]};
     _ ->
       {failed, ChildList}
   end.
+
+next_id([]) -> 1;
+next_id(ChildList) ->
+  {Id, _, _} = hd(lists:reverse(lists:keysort(4, ChildList))),
+  Id + 1.
