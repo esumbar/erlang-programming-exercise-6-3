@@ -41,9 +41,10 @@ loop(ChildList) ->
     {'EXIT', Pid, _Reason} ->
       NewChildList = restart_child(Pid, ChildList),
       loop(NewChildList);
-    {start_child, From, Child = {_M, _F, _A}} ->
-      From ! {reply, Child},
-      loop(ChildList);
+    {start_child, From, Child} ->
+      {Reply, NewChildList} = start_child(Child, ChildList),
+      From ! {reply, Reply},
+      loop(NewChildList);
     {stop, From}  ->
       From ! {reply, terminate(ChildList)}
   end.
@@ -69,3 +70,11 @@ terminate(_ChildList) -> ok.
 start_child(Name, Module, Function, Argument) ->
   Name ! {start_child, self(), {Module, Function, Argument}},
   receive {reply, Reply} -> Reply end.
+
+start_child({M, F, A}, ChildList) ->
+  case (catch apply(M,F,A)) of
+    {ok, Pid} ->
+      {ok, [{Pid, {M,F,A}} | ChildList]};
+    _ ->
+      {failed, ChildList}
+  end.
