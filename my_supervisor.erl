@@ -63,9 +63,9 @@ terminate([{_, Pid, _} | ChildList]) ->
   terminate(ChildList);
 terminate(_ChildList) -> ok.
 
-%% Client routine to start a child process after the supervisor
-%% has started. A corresponding clause is added to the supervisor
-%% loop.
+%% Client and supervisor routines to start a child process after the
+%% supervisor has started. A corresponding clause is added to the
+%% supervisor loop above.
 
 start_child(Name, Module, Function, Argument) ->
   Name ! {start_child, self(), {Module, Function, Argument}},
