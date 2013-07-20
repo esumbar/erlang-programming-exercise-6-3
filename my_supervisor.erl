@@ -39,10 +39,14 @@ start_children(Id, [{M, F, A, transient} | ChildSpecList]) ->
 %% If a child terminates, the supervisor receives the EXIT signal and restarts the terminated 
 %% child, replacing its entry in the list of children stored in the ChildList variable:
 
-restart_child(Pid, ChildList, _Reason) ->
-  {Id, Pid, {M,F,A,T}} = lists:keyfind(Pid, 2, ChildList),
-  {ok, NewPid} = apply(M,F,A),
-  [{Id, NewPid, {M,F,A,T}}|lists:keydelete(Pid,2,ChildList)].
+restart_child(Pid, ChildList, Reason) ->
+  case lists:keyfind(Pid, 2, ChildList) of
+    {_Id, Pid, {_M,_F,_A,transient}} when Reason == normal ->
+      lists:keydelete(Pid, 2, ChildList);
+    {Id, Pid, {M,F,A,T}} ->
+      {ok, NewPid} = apply(M,F,A),
+      [{Id, NewPid, {M,F,A,T}} | lists:keydelete(Pid, 2, ChildList)]
+  end.
 
 loop(ChildList) ->
   receive
