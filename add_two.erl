@@ -7,11 +7,17 @@
 %%   (c) Francesco Cesarini and Simon Thompson
 
 -module(add_two).
--export([start/0, request/1, loop/0]).
+-export([start/0, stop/0, request/1, loop/0]).
 
 start() ->
   register(add_two, Pid = spawn_link(add_two, loop, [])),
   {ok, Pid}.
+
+stop() ->
+  add_two ! {request, self(), stop},
+  receive
+    {result, Result} -> Result
+  end.
 
 request(Int) ->
   add_two ! {request, self(), Int},
@@ -21,7 +27,9 @@ request(Int) ->
 
 loop() ->
   receive
+    {request, Pid, stop} ->
+      Pid ! {result, ok};
     {request, Pid, Msg} ->
-       Pid ! {result, Msg + 2},
-       loop()
+      Pid ! {result, Msg + 2},
+      loop()
   end.
