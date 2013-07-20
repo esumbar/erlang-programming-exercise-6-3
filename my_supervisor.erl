@@ -8,7 +8,7 @@
 
 -module(my_supervisor).
 -export([start_link/2, stop/1]).
--export([start_child/4, stop_child/2]).
+-export([start_child/5, stop_child/2]).
 -export([print_childlist/1]).
 -export([init/1]).
 
@@ -20,10 +20,10 @@ init(ChildSpecList) ->
   loop(start_children(_Id = 1, ChildSpecList)).
 
 start_children(_, []) -> [];
-start_children(Id, [{M, F, A} | ChildSpecList]) ->
+start_children(Id, [{M, F, A, T} | ChildSpecList]) ->
   case (catch apply(M,F,A)) of
     {ok, Pid} ->
-      [{Id, Pid, {M,F,A}}|start_children(Id + 1, ChildSpecList)];
+      [{Id, Pid, {M,F,A,T}}|start_children(Id + 1, ChildSpecList)];
     _ ->
       start_children(Id + 1, ChildSpecList)
   end.
@@ -33,9 +33,9 @@ start_children(Id, [{M, F, A} | ChildSpecList]) ->
 %% child, replacing its entry in the list of children stored in the ChildList variable:
 
 restart_child(Pid, ChildList) ->
-  {Id, Pid, {M,F,A}} = lists:keyfind(Pid, 2, ChildList),
+  {Id, Pid, {M,F,A,T}} = lists:keyfind(Pid, 2, ChildList),
   {ok, NewPid} = apply(M,F,A),
-  [{Id, NewPid, {M,F,A}}|lists:keydelete(Pid,2,ChildList)].
+  [{Id, NewPid, {M,F,A,T}}|lists:keydelete(Pid,2,ChildList)].
 
 loop(ChildList) ->
   receive
@@ -75,15 +75,15 @@ terminate(_ChildList) -> ok.
 %% supervisor has started. A corresponding clause is added to the
 %% supervisor loop above.
 
-start_child(Name, Module, Function, Argument) ->
-  Name ! {start_child, self(), {Module, Function, Argument}},
+start_child(Name, Module, Function, Argument, Type) ->
+  Name ! {start_child, self(), {Module, Function, Argument, Type}},
   receive {reply, Reply} -> Reply end.
 
-start_child({M, F, A}, ChildList) ->
+start_child({M, F, A, T}, ChildList) ->
   Id = next_id(ChildList),
   case (catch apply(M,F,A)) of
     {ok, Pid} ->
-      {{ok, Id}, [{Id, Pid, {M,F,A}} | ChildList]};
+      {{ok, Id}, [{Id, Pid, {M,F,A,T}} | ChildList]};
     _ ->
       {failed, ChildList}
   end.
