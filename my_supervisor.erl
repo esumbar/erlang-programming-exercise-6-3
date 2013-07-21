@@ -23,17 +23,24 @@ start_children(_, []) -> [];
 start_children(Id, [{M, F, A, permanent} | ChildSpecList]) ->
   case (catch apply(M,F,A)) of
     {ok, Pid} ->
-      [{Id, Pid, {M,F,A,permanent}}|start_children(Id + 1, ChildSpecList)];
+      [{Id, Pid, {M,F,A,permanent, initial_restarts()}}|start_children(Id + 1, ChildSpecList)];
     _ ->
       start_children(Id + 1, ChildSpecList)
   end;
 start_children(Id, [{M, F, A, transient} | ChildSpecList]) ->
   case (catch apply(M,F,A)) of
     {ok, Pid} ->
-      [{Id, Pid, {M,F,A,transient}}|start_children(Id + 1, ChildSpecList)];
+      [{Id, Pid, {M,F,A,transient}, initial_restarts()}|start_children(Id + 1, ChildSpecList)];
     _ ->
       start_children(Id + 1, ChildSpecList)
   end.
+
+%% Blank restart times matching pattern returned by
+%% erlang:now/0.
+
+initial_restarts() ->
+  Z = {0, 0, 0},
+  [Z, Z, Z, Z, Z, Z].
 
 %% The loop of the supervisor waits in a receive clause for EXIT and stop messages. 
 %% If a child terminates, the supervisor receives the EXIT signal and restarts the terminated 
@@ -41,11 +48,11 @@ start_children(Id, [{M, F, A, transient} | ChildSpecList]) ->
 
 restart_child(Pid, ChildList, Reason) ->
   case lists:keyfind(Pid, 2, ChildList) of
-    {_Id, Pid, {_M,_F,_A,transient}} when Reason == normal ->
+    {_Id, Pid, {_M,_F,_A,transient}, _R} when Reason == normal ->
       lists:keydelete(Pid, 2, ChildList);
-    {Id, Pid, {M,F,A,T}} ->
+    {Id, Pid, {M,F,A,T}, R} ->
       {ok, NewPid} = apply(M,F,A),
-      [{Id, NewPid, {M,F,A,T}} | lists:keydelete(Pid, 2, ChildList)]
+      [{Id, NewPid, {M,F,A,T}, R} | lists:keydelete(Pid, 2, ChildList)]
   end.
 
 loop(ChildList) ->
@@ -94,7 +101,7 @@ start_child({M, F, A, permanent}, ChildList) ->
   Id = next_id(ChildList),
   case (catch apply(M,F,A)) of
     {ok, Pid} ->
-      {{ok, Id}, [{Id, Pid, {M,F,A,permanent}} | ChildList]};
+      {{ok, Id}, [{Id, Pid, {M,F,A,permanent}, initial_restarts()} | ChildList]};
     _ ->
       {failed, ChildList}
   end;
@@ -102,7 +109,7 @@ start_child({M, F, A, transient}, ChildList) ->
   Id = next_id(ChildList),
   case (catch apply(M,F,A)) of
     {ok, Pid} ->
-      {{ok, Id}, [{Id, Pid, {M,F,A,transient}} | ChildList]};
+      {{ok, Id}, [{Id, Pid, {M,F,A,transient}, initial_restarts()} | ChildList]};
     _ ->
       {failed, ChildList}
   end.
