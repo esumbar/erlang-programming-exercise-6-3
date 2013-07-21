@@ -54,8 +54,9 @@ restart_child(Pid, ChildList, Reason) ->
     {_Id, Pid, {_M,_F,_A,transient}, _R} when Reason == normal ->
       lists:keydelete(Pid, 2, ChildList);
     {Id, Pid, {M,F,A,T}, R} ->
+      NewRestarts = [erlang:now() | lists:reverse(tl(lists:reverse(R)))],
       {ok, NewPid} = apply(M,F,A),
-      [{Id, NewPid, {M,F,A,T}, R} | lists:keydelete(Pid, 2, ChildList)]
+      [{Id, NewPid, {M,F,A,T}, NewRestarts} | lists:keydelete(Pid, 2, ChildList)]
   end.
 
 loop(ChildList) ->
@@ -87,7 +88,7 @@ stop(Name) ->
   Name ! {stop, self()},
   receive {reply, Reply} -> Reply end.
 
-terminate([{_, Pid, _} | ChildList]) ->
+terminate([{_, Pid, _, _} | ChildList]) ->
   exit(Pid, kill),
   terminate(ChildList);
 terminate(_ChildList) -> ok.
@@ -119,7 +120,7 @@ start_child({M, F, A, transient}, ChildList) ->
 
 next_id([]) -> 1;
 next_id(ChildList) ->
-  {Id, _, _} = hd(lists:reverse(lists:keysort(1, ChildList))),
+  {Id, _, _, _} = hd(lists:reverse(lists:keysort(1, ChildList))),
   Id + 1.
 
 %% Client and supervisor routines for stopping a child.
@@ -129,7 +130,7 @@ stop_child(Name, Id) ->
   receive {reply, Reply} -> Reply end.
 
 terminate_child(_, []) -> [];
-terminate_child(Id, [{Id, Pid, _} | ChildList]) ->
+terminate_child(Id, [{Id, Pid, _, _} | ChildList]) ->
   unlink(Pid),
   exit(Pid, kill),
   terminate_child(Id, ChildList);
