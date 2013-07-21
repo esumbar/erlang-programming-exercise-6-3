@@ -35,12 +35,15 @@ start_children(Id, [{M, F, A, transient} | ChildSpecList]) ->
       start_children(Id + 1, ChildSpecList)
   end.
 
-%% Blank restart times matching pattern returned by
-%% erlang:now/0.
+%% Initialize restart times, matching pattern returned by
+%% erlang:now/0. Record five restarts. First entry is the
+%% latest restart time, the last is the oldest. Calculate
+%% the difference between the first and last. Should be
+%% less than or equal to 60 seconds to satisfy the spec.
 
 initial_restarts() ->
   Z = {0, 0, 0},
-  [Z, Z, Z, Z, Z, Z].
+  [Z, Z, Z, Z, Z].
 
 %% The loop of the supervisor waits in a receive clause for EXIT and stop messages. 
 %% If a child terminates, the supervisor receives the EXIT signal and restarts the terminated 
