@@ -55,9 +55,18 @@ restart_child(Pid, ChildList, Reason) ->
       lists:keydelete(Pid, 2, ChildList);
     {Id, Pid, {M,F,A,T}, R} ->
       NewRestarts = [erlang:now() | lists:reverse(tl(lists:reverse(R)))],
-      {ok, NewPid} = apply(M,F,A),
-      [{Id, NewPid, {M,F,A,T}, NewRestarts} | lists:keydelete(Pid, 2, ChildList)]
+      case high_restart_rate(NewRestarts) of
+        true ->
+          io:format("Removed child for exceeding restart rate: ~p~n", [{Id, {M, F, A}, NewRestarts}]),
+          lists:keydelete(Pid, 2, ChildList);
+        false ->
+          {ok, NewPid} = apply(M,F,A),
+          [{Id, NewPid, {M,F,A,T}, NewRestarts} | lists:keydelete(Pid, 2, ChildList)]
+      end
   end.
+
+high_restart_rate([{Mega1,Sec1,Micro1}, _, _, _, {Mega5,Sec5,Micro5}]) ->
+  ((Mega1 - Mega5) * 1000000 + (Sec1 - Sec5) + (Micro1 - Micro5) * 0.0000001) < 60.
 
 loop(ChildList) ->
   receive
