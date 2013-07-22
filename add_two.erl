@@ -20,9 +20,14 @@ stop() ->
   end.
 
 request(Int) ->
+  Reference = erlang:monitor(process, add_two),
   add_two ! {request, self(), Int},
   receive
-    {result, Result} -> Result
+    {result, Result} ->
+      erlang:demonitor(Reference),
+      Result;
+    {'DOWN',Reference,process,_Pid,Reason} ->
+      Reason
   end.
 
 loop() ->
