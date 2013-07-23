@@ -12,4 +12,4 @@ I used the `add_two` module during development. When I caused `add_two:request/1
 
 Besides employing a monitor, I added a `stop/0` function to the `add_two` module to test the restart semantics for a `transient` child that terminates normally.
 
-On my second attempt, I decided to start anew, but in the order 3-1-2.
+On my second attempt, I decided to start anew, but in the order 3-1-2. To answer the question "Why choose to identify the child through its `Id` instead of the `Pid` when stopping it", the child may be restarted so that the current `Pid` will be unknown.
